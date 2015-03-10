@@ -26,6 +26,8 @@ int main(int argc, char* argv[]){
   PacketSniffer sniffer(argv[1]);
   if( sniffer.Init() < 0)
     return 0;
+  if( sniffer.SetPromisc(true) < 0)
+    return 0;
 
   char buf[0xffff];
   ssize_t len;
@@ -38,8 +40,9 @@ int main(int argc, char* argv[]){
 
     // ip
     iphdr* pIp = (iphdr*) (buf + sizeof(ethhdr));
-    sockaddr_in addr;
-    addr.sin_addr.s_addr = pIp->saddr;
+    sockaddr_in addr_src, addr_dst;
+    addr_src.sin_addr.s_addr = pIp->saddr;
+    addr_dst.sin_addr.s_addr = pIp->daddr;
 
     // tcp/udp
     switch( pIp->protocol){
@@ -47,8 +50,10 @@ int main(int argc, char* argv[]){
         {
           udphdr* pUdp = (udphdr*) (buf + sizeof(ethhdr) + pIp->ihl * 4);
           if (port > 0 && ntohs(pUdp->dest) != port) break;
-          printf("[udp packet from %s : %u, len : %u]\t", 
-              inet_ntoa(addr.sin_addr), ntohs(pUdp->source), ntohs(pUdp->len)); 
+          printf("[udp %-16s : %-6u -> %-16s : %-6u , len : %-4u] ", 
+              inet_ntoa(addr_src.sin_addr), ntohs(pUdp->source), 
+              inet_ntoa(addr_dst.sin_addr), ntohs(pUdp->source), 
+              ntohs(pUdp->len)); 
 
           // test CheckSum.cpp (IP/UDP)
           printf("origin cksum(ip,udp): %x %x, %x %x\t",
@@ -77,8 +82,10 @@ int main(int argc, char* argv[]){
         {
           tcphdr* pTcp = (tcphdr*) (buf + sizeof(ethhdr) + pIp->ihl * 4);
           if (port > 0 && ntohs(pTcp->dest) != port) break;
-          printf("[tcp packet from %s : %u, len : %u]\t", 
-              inet_ntoa(addr.sin_addr), ntohs(pTcp->source), ntohs(pIp->tot_len) - 34); 
+          printf("[tcp %-16s : %-6u -> %-16s : %-6u , len : %-4u] ", 
+              inet_ntoa(addr_src.sin_addr), ntohs(pTcp->source), 
+              inet_ntoa(addr_dst.sin_addr), ntohs(pTcp->source), 
+              ntohs(pIp->tot_len) - 34); 
 
           // test CheckSum.cpp (IP/TCP)
           printf("origin cksum(ip,tcp): %x %x, %x %x\t",
